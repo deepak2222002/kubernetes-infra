@@ -1,0 +1,93 @@
+pipeline {
+
+    agent any
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Create SQL Server Secret') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'sqlserver-sa',
+                        usernameVariable: 'SA_USERNAME',
+                        passwordVariable: 'SA_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        kubectl create secret generic sqlserver-sa-secret \
+                          --from-literal=MSSQL_SA_PASSWORD="$SA_PASSWORD" \
+                          --dry-run=client -o yaml | kubectl apply -f -
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy SQL Server') {
+            steps {
+                sh '''
+                    kubectl apply -f sqlserver/sqlserver.yaml
+
+                    kubectl rollout status deployment/sqlserver --timeout=180s
+                '''
+            }
+        }
+
+        stage('Create Remote User Secret') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'db-remoteuser',
+                        usernameVariable: 'DB_USERNAME',
+                        passwordVariable: 'DB_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        kubectl create secret generic sql-init-secret \
+                          --from-literal=DB_USERNAME="$DB_USERNAME" \
+                          --from-literal=DB_PASSWORD="$DB_PASSWORD" \
+                          --dry-run=client -o yaml | kubectl apply -f -
+                    '''
+                }
+            }
+        }
+
+        stage('Create Database Initialization Config') {
+            steps {
+                sh '''
+                    kubectl apply -f sqlserver/sql-init.yaml
+                '''
+            }
+        }
+
+        stage('Run Database Initialization') {
+            steps {
+                sh '''
+                    kubectl delete job sql-init --ignore-not-found=true
+
+                    kubectl apply -f sqlserver/sql-init-job.yaml
+
+                    kubectl wait \
+                      --for=condition=complete \
+                      job/sql-init \
+                      --timeout=180s
+                '''
+            }
+        }
+
+        stage('Verify SQL Server') {
+            steps {
+                sh '''
+                    kubectl get pods
+                    kubectl get service sqlserver
+                    kubectl get job sql-init
+                '''
+            }
+        }
+    }
+}
