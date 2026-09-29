@@ -1,5 +1,6 @@
 apiVersion: batch/v1
 kind: Job
+
 metadata:
   name: sql-init
 
@@ -16,7 +17,7 @@ spec:
       containers:
         - name: sql-init
 
-          image: mcr.microsoft.com/mssql-tools18:latest
+          image: mcr.microsoft.com/mssql/server:2022-latest
 
           env:
             - name: DB_USERNAME
@@ -82,7 +83,7 @@ spec:
 
               echo "SQL initialization completed."
 
-      volumes:
-        - name: sql-init-script
-          configMap:
-            name: sql-init-script
+          volumes:
+            - name: sql-init-script
+              configMap:
+                name: sql-init-script
