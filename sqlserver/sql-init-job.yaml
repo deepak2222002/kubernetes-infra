@@ -83,7 +83,7 @@ spec:
 
               echo "SQL initialization completed."
 
-          volumes:
-            - name: sql-init-script
-              configMap:
-                name: sql-init-script
+      volumes:
+        - name: sql-init-script
+          configMap:
+            name: sql-init-script
