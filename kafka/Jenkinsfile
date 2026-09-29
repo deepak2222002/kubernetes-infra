@@ -1,0 +1,31 @@
+pipeline {
+
+    agent any
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Deploy Kafka') {
+            steps {
+                sh '''
+                    kubectl apply -f kafka/kafka.yaml
+                '''
+            }
+        }
+
+        stage('Verify Kafka Deployment') {
+            steps {
+                sh '''
+                    kubectl rollout status deployment/kafka --timeout=180s
+                    kubectl get pods
+                    kubectl get service kafka
+                '''
+            }
+        }
+    }
+}
